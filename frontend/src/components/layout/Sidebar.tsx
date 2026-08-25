@@ -12,7 +12,7 @@ import { useAuthStore } from '../../store/auth'
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/claims', icon: FileText, label: 'Claims' },
-  { to: '/chat', icon: MessageSquare, label: 'Ask AI' },
+  { to: '/chat', icon: MessageSquare, label: 'icarKno Chat' },
   { to: '/sync', icon: RefreshCw, label: 'Sync' },
 ]
 

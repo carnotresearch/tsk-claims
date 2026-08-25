@@ -25,7 +25,8 @@ class ChatSession(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="chat_sessions")
     messages: Mapped[list["ChatMessage"]] = relationship(
-        "ChatMessage", back_populates="session", order_by="ChatMessage.created_at"
+        "ChatMessage", back_populates="session", order_by="ChatMessage.created_at",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

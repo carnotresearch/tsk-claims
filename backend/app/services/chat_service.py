@@ -111,8 +111,22 @@ async def handle_message(
     system_prompt = _build_system_prompt(hospital_id)
 
     # Generate SQL
-    sql = await llm.generate_sql(system_prompt, history, user_content)
-    log.info("chat session=%d generated SQL: %s", session.id, sql)
+    try:
+        sql = await llm.generate_sql(system_prompt, history, user_content)
+        log.info("chat session=%d generated SQL: %s", session.id, sql)
+    except Exception as exc:
+        log.warning("LLM call failed: %s", exc)
+        sql = None
+        user_msg = ChatMessage(session_id=session.id, role="user", content=user_content)
+        db.add(user_msg)
+        assistant_msg = ChatMessage(
+            session_id=session.id,
+            role="assistant",
+            content=f"The AI service is unavailable right now. Please check that GEMINI_API_KEY is set correctly. Error: {exc}",
+        )
+        db.add(assistant_msg)
+        await db.flush()
+        return assistant_msg
 
     result_rows: list[dict[str, Any]] | None = None
     answer_content: str
@@ -126,15 +140,22 @@ async def handle_message(
     else:
         try:
             result_rows = await _run_query(db, sql)
-            answer_content = (
-                f"Query returned {len(result_rows)} row(s)."
-                if result_rows
-                else "The query returned no results."
-            )
         except Exception as exc:
             log.warning("SQL execution failed: %s", exc)
-            answer_content = f"SQL execution error: {exc}"
+            answer_content = f"I ran into an error executing the query: {exc}"
             result_rows = None
+        else:
+            # Step 2 — ask the LLM to analyse the results in plain English
+            try:
+                answer_content = await llm.generate_answer(user_content, sql, result_rows)
+            except Exception as exc:
+                log.warning("LLM analysis failed: %s", exc)
+                # Fallback to a simple count summary so the user still gets something
+                answer_content = (
+                    f"Query returned {len(result_rows)} row(s)."
+                    if result_rows
+                    else "The query returned no results."
+                )
 
     # Persist user message
     user_msg = ChatMessage(

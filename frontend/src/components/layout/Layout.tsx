@@ -8,7 +8,7 @@ import { getMe } from '../../api/auth'
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/claims': 'Claims',
-  '/chat': 'Ask AI',
+  '/chat': 'icarKno Chat',
   '/users': 'Users',
   '/sync': 'Sync',
 }

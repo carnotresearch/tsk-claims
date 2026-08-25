@@ -71,6 +71,25 @@ async def get_messages(
     return result.scalars().all()
 
 
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    session = (
+        await db.execute(
+            select(ChatSession).where(
+                ChatSession.id == session_id,
+                ChatSession.user_id == current_user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    await db.delete(session)
+
+
 @router.post("/sessions/{session_id}/messages", response_model=MessageResponse)
 async def send_message(
     session_id: int,

@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 
 
 class LLMProvider(ABC):
-    """Minimal interface for text-to-SQL LLM backends."""
+    """Minimal interface for text-to-SQL + analysis LLM backends."""
 
     @abstractmethod
     async def generate_sql(
@@ -29,4 +29,23 @@ class LLMProvider(ABC):
 
         Returns:
             A SQL string (SELECT only).
+        """
+
+    @abstractmethod
+    async def generate_answer(
+        self,
+        user_question: str,
+        sql: str,
+        rows: list[dict],
+    ) -> str:
+        """
+        Produce a natural-language analysis of SQL query results.
+
+        Args:
+            user_question: The original question from the user.
+            sql:           The SQL that was executed.
+            rows:          Result rows as a list of dicts.
+
+        Returns:
+            A concise, friendly answer in plain English.
         """

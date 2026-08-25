@@ -12,3 +12,7 @@ export const getMessages = async (sessionId: number): Promise<ChatMessage[]> =>
 
 export const sendMessage = async (sessionId: number, content: string): Promise<ChatMessage> =>
   (await api.post<ChatMessage>(`/chat/sessions/${sessionId}/messages`, { content })).data
+
+export const deleteSession = async (sessionId: number): Promise<void> => {
+  await api.delete(`/chat/sessions/${sessionId}`)
+}

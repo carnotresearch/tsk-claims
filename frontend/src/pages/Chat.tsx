@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Send, Plus, ChevronDown, Bot, User } from 'lucide-react'
-import { getSessions, createSession, getMessages, sendMessage } from '../api/chat'
+import { Send, Plus, ChevronDown, Bot, User, MoreVertical, Trash2 } from 'lucide-react'
+import { getSessions, createSession, getMessages, sendMessage, deleteSession } from '../api/chat'
 import type { ChatMessage, ChatSession } from '../types'
 import Spinner from '../components/ui/Spinner'
 
@@ -67,10 +67,59 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   )
 }
 
+function SessionItem({
+  session,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  session: ChatSession
+  active: boolean
+  onSelect: () => void
+  onDelete: () => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  return (
+    <div className={`group relative flex items-center rounded-lg transition-colors ${active ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
+      <button
+        onClick={onSelect}
+        className={`flex-1 text-left px-3 py-2 text-sm truncate ${active ? 'text-indigo-700 font-medium' : 'text-gray-600'}`}
+      >
+        {session.title ?? `Chat ${session.id}`}
+      </button>
+
+      {/* 3-dot menu */}
+      <div className="relative shrink-0 pr-1">
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
+          className={`p-1 rounded text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 ${menuOpen ? 'opacity-100' : ''}`}
+        >
+          <MoreVertical size={14} />
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32">
+              <button
+                onClick={() => { setMenuOpen(false); onDelete() }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+              >
+                <Trash2 size={13} /> Delete
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Chat() {
   const qc = useQueryClient()
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null)
   const [input, setInput] = useState('')
+  const [sendError, setSendError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const sessionsQ = useQuery({ queryKey: ['chat-sessions'], queryFn: getSessions })
@@ -88,10 +137,23 @@ export default function Chat() {
     },
   })
 
+  const deleteChat = useMutation({
+    mutationFn: (id: number) => deleteSession(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['chat-sessions'] })
+      if (activeSession?.id === id) setActiveSession(null)
+    },
+  })
+
   const sendMsg = useMutation({
     mutationFn: (content: string) => sendMessage(activeSession!.id, content),
     onSuccess: () => {
+      setSendError('')
       qc.invalidateQueries({ queryKey: ['chat-messages', activeSession?.id] })
+    },
+    onError: (e: unknown) => {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setSendError(detail ?? 'Failed to get a response. Please try again.')
     },
   })
 
@@ -103,6 +165,7 @@ export default function Chat() {
     const text = input.trim()
     if (!text || !activeSession || sendMsg.isPending) return
     setInput('')
+    setSendError('')
     sendMsg.mutate(text)
   }
 
@@ -116,20 +179,16 @@ export default function Chat() {
         >
           <Plus size={15} /> New Chat
         </button>
-        <div className="card p-2 flex-1 overflow-y-auto space-y-1">
+        <div className="card p-2 flex-1 overflow-y-auto space-y-0.5">
           {sessionsQ.isLoading && <Spinner />}
           {sessionsQ.data?.map(s => (
-            <button
+            <SessionItem
               key={s.id}
-              onClick={() => setActiveSession(s)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors truncate ${
-                activeSession?.id === s.id
-                  ? 'bg-indigo-50 text-indigo-700 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {s.title ?? `Chat ${s.id}`}
-            </button>
+              session={s}
+              active={activeSession?.id === s.id}
+              onSelect={() => setActiveSession(s)}
+              onDelete={() => { if (confirm(`Delete "${s.title ?? `Chat ${s.id}`}"?`)) deleteChat.mutate(s.id) }}
+            />
           ))}
           {sessionsQ.data?.length === 0 && (
             <p className="text-xs text-gray-400 px-2 py-4 text-center">No sessions yet</p>
@@ -174,6 +233,16 @@ export default function Chat() {
                             <div key={i} className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
                           ))}
                         </div>
+                      </div>
+                    </div>
+                  )}
+                  {sendError && (
+                    <div className="flex gap-3">
+                      <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center shrink-0">
+                        <Bot size={14} className="text-white" />
+                      </div>
+                      <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm max-w-[80%]">
+                        {sendError}
                       </div>
                     </div>
                   )}
