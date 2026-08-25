@@ -7,7 +7,7 @@ settings = get_settings()
 
 # ── Async engine (runtime) ────────────────────────────────────────────────────
 engine = create_async_engine(
-    settings.database_url,
+    settings.db_url,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

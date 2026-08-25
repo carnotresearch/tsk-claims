@@ -64,14 +64,14 @@ def _create_test_schema():
     """Drop and recreate all tables once per pytest session."""
 
     async def _setup():
-        engine = create_async_engine(settings.database_url, echo=False)
+        engine = create_async_engine(settings.db_url, echo=False)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
         await engine.dispose()
 
     async def _teardown():
-        engine = create_async_engine(settings.database_url, echo=False)
+        engine = create_async_engine(settings.db_url, echo=False)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
         await engine.dispose()
@@ -94,7 +94,7 @@ async def db_session(_create_test_schema) -> AsyncGenerator[AsyncSession, None]:
 
     Tables are truncated in the finally block so the next test starts clean.
     """
-    engine = create_async_engine(settings.database_url, echo=False)
+    engine = create_async_engine(settings.db_url, echo=False)
     Session = async_sessionmaker(
         bind=engine,
         class_=AsyncSession,

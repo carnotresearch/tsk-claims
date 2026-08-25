@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,8 +17,31 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # ── Database ──────────────────────────────────────────────
-    database_url: str
-    database_url_sync: str
+    # Accept individual components (preferred — handles special chars in password)
+    # OR full URLs as fallback (DATABASE_URL / DATABASE_URL_SYNC env vars)
+    postgres_user: str = "hsk"
+    postgres_password: str = ""
+    postgres_host: str = "db"
+    postgres_port: int = 5432
+    postgres_db: str = "hsk_claims"
+
+    # Full URL overrides (used in dev/test where DATABASE_URL is set directly)
+    database_url: str = ""
+    database_url_sync: str = ""
+
+    @property
+    def db_url(self) -> str:
+        if self.database_url:
+            return self.database_url
+        pw = quote_plus(self.postgres_password)
+        return f"postgresql+asyncpg://{self.postgres_user}:{pw}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+
+    @property
+    def db_url_sync(self) -> str:
+        if self.database_url_sync:
+            return self.database_url_sync
+        pw = quote_plus(self.postgres_password)
+        return f"postgresql+psycopg://{self.postgres_user}:{pw}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     # ── Auth ──────────────────────────────────────────────────
     secret_key: str

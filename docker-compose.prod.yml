@@ -34,8 +34,11 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-hsk}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hsk_claims}
-      DATABASE_URL_SYNC: postgresql+psycopg://${POSTGRES_USER:-hsk}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hsk_claims}
+      POSTGRES_USER: ${POSTGRES_USER:-hsk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-hsk_claims}
       SECRET_KEY: ${SECRET_KEY}
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
