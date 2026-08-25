@@ -1,0 +1,13 @@
+-r requirements.txt
+
+# Test runner
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+anyio[asyncio]==4.7.0
+
+# HTTP client for API tests
+httpx==0.28.1
+
+# Async test utilities
+asgi-lifespan==2.1.0

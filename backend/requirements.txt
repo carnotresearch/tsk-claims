@@ -1,0 +1,31 @@
+# ── Web framework ──────────────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# ── Database ───────────────────────────────────────────────────────────────────
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+psycopg[binary]==3.2.3
+psycopg==3.2.3
+alembic==1.14.0
+
+# ── Config / validation ────────────────────────────────────────────────────────
+pydantic-settings==2.6.1
+python-multipart==0.0.12
+
+# ── Auth ───────────────────────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+passlib==1.7.4
+
+# ── Excel parsing ──────────────────────────────────────────────────────────────
+openpyxl==3.1.5
+
+# ── Scheduler ──────────────────────────────────────────────────────────────────
+apscheduler==3.10.4
+
+# ── HTTP client ────────────────────────────────────────────────────────────────
+httpx==0.28.1
+
+# ── LLM — Gemini (modular: swap by changing LLM_PROVIDER env var) ─────────────
+google-generativeai==0.8.3
