@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Send, Plus, ChevronDown, Bot, User, MoreVertical, Trash2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { getSessions, createSession, getMessages, sendMessage, deleteSession } from '../api/chat'
 import type { ChatMessage, ChatSession } from '../types'
 import Spinner from '../components/ui/Spinner'
@@ -49,6 +50,24 @@ function ResultTable({ rows }: { rows: Record<string, unknown>[] }) {
   )
 }
 
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      components={{
+        p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        em: ({ children }) => <em className="italic">{children}</em>,
+        ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>,
+        li: ({ children }) => <li>{children}</li>,
+        code: ({ children }) => <code className="bg-black/10 rounded px-1 text-xs font-mono">{children}</code>,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  )
+}
+
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === 'user'
   return (
@@ -57,8 +76,8 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
         {isUser ? <User size={14} className="text-white" /> : <Bot size={14} className="text-white" />}
       </div>
       <div className={`max-w-[80%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
-        <div className={`px-4 py-2.5 rounded-2xl text-sm ${isUser ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm'}`}>
-          {msg.content}
+        <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${isUser ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm'}`}>
+          {isUser ? msg.content : <MarkdownContent content={msg.content} />}
         </div>
         {msg.sql_generated && <SqlBlock sql={msg.sql_generated} />}
         {msg.result_rows && msg.result_rows.length > 0 && <ResultTable rows={msg.result_rows} />}
