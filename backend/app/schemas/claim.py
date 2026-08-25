@@ -17,14 +17,44 @@ class ClaimSummary(BaseModel):
     date_admission: date | None
     date_discharge: date | None
     los_days: int | None
+    procedure_name: str | None = None
     payer_type: str | None
     insurer_name: str | None
+    tpa_name: str | None = None
+    policy_no: str | None = None
+
+    # Financials
+    preauth_requested_amt: Decimal | None = None
+    preauth_approved_amt: Decimal | None = None
     final_claimed_amt: Decimal | None
     final_bill_approved_amt: Decimal | None
+    hospital_discount: Decimal | None = None
+    patient_paid_amt: Decimal | None = None
+    disallowed_amt: Decimal | None = None
+    settled_amt: Decimal | None = None
     payment_received_amt: Decimal | None
+    tds_amt: Decimal | None = None
+    deduction_amt: Decimal | None = None
     outstanding_amt: Decimal | None
+
+    # Settlement & TATs
+    utr_no: str | None = None
+    payment_mode: str | None = None
+    payment_received_date: date | None = None
+    preauth_tat: int | None = None
+    discharge_tat: int | None = None
+    submission_tat: int | None = None
+    payment_tat: int | None = None
+    query_resolution_tat: int | None = None
+
+    # Ageing & Status
+    ageing_days: int | None = None
     ageing_bucket: str | None
     final_claim_status: str | None
+    submission_type: str | None = None
+    submission_status: str | None = None
+    denial_reason: str | None = None
+    hospital_remarks: str | None = None
 
 
 class ClaimDetail(BaseModel):
