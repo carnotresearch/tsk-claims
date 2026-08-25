@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 import KpiCard from '../components/ui/KpiCard'
 import Spinner from '../components/ui/Spinner'
+import WorkflowStage from '../components/ui/WorkflowStage'
 import ClaimsDrilldownModal, { DrilldownViewMode } from '../components/ui/ClaimsDrilldownModal'
 import {
   getKPIs,
@@ -718,6 +719,10 @@ export default function Dashboard() {
 
           {disallowancesQ.isLoading ? (
             <Spinner />
+          ) : !disallowancesQ.data || disallowancesQ.data.length === 0 ? (
+            <div className="py-12 text-center text-xs text-gray-400">
+              No disallowances recorded
+            </div>
           ) : (
             <div className="overflow-x-auto flex-1 max-h-[260px] overflow-y-auto pr-1">
               <table className="w-full text-xs">
@@ -860,39 +865,23 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-11 gap-4 items-center">
             {/* Stage 1: Preauth Status */}
-            <div className="md:col-span-3 bg-slate-50/70 border border-gray-100 rounded-xl p-3">
-              <div className="font-bold text-xs text-indigo-900 uppercase tracking-wide border-b border-gray-200 pb-1.5 mb-2 flex items-center justify-between">
-                <span>Preauth Status</span>
-                <span className="w-2 h-2 rounded-full bg-indigo-500" />
-              </div>
-              <div className="space-y-1">
-                {statusSnapshotQ.data?.preauth_statuses.map((item) => (
-                  <div
-                    key={item.status}
-                    onClick={() =>
-                      openDrilldown({
-                        title: `Preauth Claims · ${item.status}`,
-                        subtitle: `Claims with Preauth Status: ${item.status} (${item.count} claims)`,
-                        badgeText: `${item.count} Claims`,
-                        badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-                        viewMode: 'overview',
-                        filters: { preauth_status: item.status },
-                      })
-                    }
-                    className="flex items-center justify-between text-xs py-1 px-2 rounded-lg cursor-pointer hover:bg-indigo-100/70 transition-colors group"
-                  >
-                    <span className="text-gray-600 group-hover:text-indigo-700">{item.status}</span>
-                    <span
-                      className={`font-semibold tabular-nums px-1.5 py-0.5 rounded text-[11px] ${
-                        item.count > 0 ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <WorkflowStage
+              title="Preauth Status"
+              titleColor="text-indigo-900"
+              dotColor="bg-indigo-500"
+              activeBadgeBg="bg-indigo-600"
+              items={statusSnapshotQ.data?.preauth_statuses}
+              onItemClick={(item) =>
+                openDrilldown({
+                  title: `Preauth Claims · ${item.status}`,
+                  subtitle: `Claims with Preauth Status: ${item.status} (${item.count} claims)`,
+                  badgeText: `${item.count} Claims`,
+                  badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+                  viewMode: 'overview',
+                  filters: { preauth_status: item.status },
+                })
+              }
+            />
 
             {/* Connector 1 */}
             <div className="hidden md:flex md:col-span-1 justify-center text-gray-300">
@@ -900,39 +889,23 @@ export default function Dashboard() {
             </div>
 
             {/* Stage 2: Discharge Status */}
-            <div className="md:col-span-3 bg-slate-50/70 border border-gray-100 rounded-xl p-3">
-              <div className="font-bold text-xs text-emerald-900 uppercase tracking-wide border-b border-gray-200 pb-1.5 mb-2 flex items-center justify-between">
-                <span>Discharge Status</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              </div>
-              <div className="space-y-1">
-                {statusSnapshotQ.data?.discharge_statuses.map((item) => (
-                  <div
-                    key={item.status}
-                    onClick={() =>
-                      openDrilldown({
-                        title: `Discharge Claims · ${item.status}`,
-                        subtitle: `Claims with Discharge Status: ${item.status} (${item.count} claims)`,
-                        badgeText: `${item.count} Claims`,
-                        badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                        viewMode: 'overview',
-                        filters: { discharge_status: item.status },
-                      })
-                    }
-                    className="flex items-center justify-between text-xs py-1 px-2 rounded-lg cursor-pointer hover:bg-emerald-100/70 transition-colors group"
-                  >
-                    <span className="text-gray-600 group-hover:text-emerald-700">{item.status}</span>
-                    <span
-                      className={`font-semibold tabular-nums px-1.5 py-0.5 rounded text-[11px] ${
-                        item.count > 0 ? 'bg-emerald-600 text-white shadow-xs' : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <WorkflowStage
+              title="Discharge Status"
+              titleColor="text-emerald-900"
+              dotColor="bg-emerald-500"
+              activeBadgeBg="bg-emerald-600"
+              items={statusSnapshotQ.data?.discharge_statuses}
+              onItemClick={(item) =>
+                openDrilldown({
+                  title: `Discharge Claims · ${item.status}`,
+                  subtitle: `Claims with Discharge Status: ${item.status} (${item.count} claims)`,
+                  badgeText: `${item.count} Claims`,
+                  badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                  viewMode: 'overview',
+                  filters: { discharge_status: item.status },
+                })
+              }
+            />
 
             {/* Connector 2 */}
             <div className="hidden md:flex md:col-span-1 justify-center text-gray-300">
@@ -940,39 +913,23 @@ export default function Dashboard() {
             </div>
 
             {/* Stage 3: Submission Status */}
-            <div className="md:col-span-3 bg-slate-50/70 border border-gray-100 rounded-xl p-3">
-              <div className="font-bold text-xs text-blue-900 uppercase tracking-wide border-b border-gray-200 pb-1.5 mb-2 flex items-center justify-between">
-                <span>Submission Status</span>
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-              </div>
-              <div className="space-y-1">
-                {statusSnapshotQ.data?.submission_statuses.map((item) => (
-                  <div
-                    key={item.status}
-                    onClick={() =>
-                      openDrilldown({
-                        title: `Submission Claims · ${item.status}`,
-                        subtitle: `Claims with Submission Status: ${item.status} (${item.count} claims)`,
-                        badgeText: `${item.count} Claims`,
-                        badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-                        viewMode: 'overview',
-                        filters: { submission_status: item.status },
-                      })
-                    }
-                    className="flex items-center justify-between text-xs py-1 px-2 rounded-lg cursor-pointer hover:bg-blue-100/70 transition-colors group"
-                  >
-                    <span className="text-gray-600 group-hover:text-blue-700">{item.status}</span>
-                    <span
-                      className={`font-semibold tabular-nums px-1.5 py-0.5 rounded text-[11px] ${
-                        item.count > 0 ? 'bg-blue-600 text-white shadow-xs' : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <WorkflowStage
+              title="Submission Status"
+              titleColor="text-blue-900"
+              dotColor="bg-blue-500"
+              activeBadgeBg="bg-blue-600"
+              items={statusSnapshotQ.data?.submission_statuses}
+              onItemClick={(item) =>
+                openDrilldown({
+                  title: `Submission Claims · ${item.status}`,
+                  subtitle: `Claims with Submission Status: ${item.status} (${item.count} claims)`,
+                  badgeText: `${item.count} Claims`,
+                  badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+                  viewMode: 'overview',
+                  filters: { submission_status: item.status },
+                })
+              }
+            />
           </div>
         )}
       </div>

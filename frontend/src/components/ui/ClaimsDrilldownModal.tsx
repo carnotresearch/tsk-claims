@@ -474,7 +474,7 @@ export default function ClaimsDrilldownModal({
                 </div>
                 <div className="bg-white p-2.5 rounded-xl border border-red-100 shadow-2xs">
                   <span className="text-[11px] font-medium text-red-600 uppercase tracking-wider block">
-                    Ageing &gt; 60 Days
+                    Ageing {'>'} 60 Days
                   </span>
                   <span className="text-lg font-bold text-red-700 mt-0.5 block">
                     {
@@ -526,7 +526,7 @@ export default function ClaimsDrilldownModal({
                     Target SLA
                   </span>
                   <span className="text-lg font-bold text-gray-800 mt-0.5 block">
-                    &le; 2.0d
+                    ≤ 2.0d
                   </span>
                 </div>
                 <div className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">

@@ -17,7 +17,7 @@ export interface ClaimFilters {
   has_paid?: boolean
   has_approved?: boolean
   has_billed?: boolean
-  tat_stage?: 'preauth' | 'discharge' | 'submission' | 'payment' | 'query' | string
+  tat_stage?: 'preauth' | 'discharge' | 'submission' | 'payment' | 'query'
   date_from?: string
   date_to?: string
   search?: string

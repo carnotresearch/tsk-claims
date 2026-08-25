@@ -36,7 +36,7 @@ export interface TATStats {
 
 export interface OperationalTATRow {
   metric: string
-  stage: string
+  stage: 'preauth' | 'discharge' | 'submission' | 'payment' | 'query'
   average: number
   fastest: number
   slowest: number
@@ -127,44 +127,44 @@ export interface ClaimSummary {
   date_admission: string | null
   date_discharge: string | null
   los_days: number | null
-  procedure_name?: string | null
+  procedure_name: string | null
   payer_type: string | null
   insurer_name: string | null
-  tpa_name?: string | null
-  policy_no?: string | null
+  tpa_name: string | null
+  policy_no: string | null
 
   // Financials
-  preauth_requested_amt?: string | null
-  preauth_approved_amt?: string | null
+  preauth_requested_amt: string | null
+  preauth_approved_amt: string | null
   final_claimed_amt: string | null
   final_bill_approved_amt: string | null
-  hospital_discount?: string | null
-  patient_paid_amt?: string | null
-  disallowed_amt?: string | null
-  settled_amt?: string | null
+  hospital_discount: string | null
+  patient_paid_amt: string | null
+  disallowed_amt: string | null
+  settled_amt: string | null
   payment_received_amt: string | null
-  tds_amt?: string | null
-  deduction_amt?: string | null
+  tds_amt: string | null
+  deduction_amt: string | null
   outstanding_amt: string | null
 
   // Settlement & TATs
-  utr_no?: string | null
-  payment_mode?: string | null
-  payment_received_date?: string | null
-  preauth_tat?: number | null
-  discharge_tat?: number | null
-  submission_tat?: number | null
-  payment_tat?: number | null
-  query_resolution_tat?: number | null
+  utr_no: string | null
+  payment_mode: string | null
+  payment_received_date: string | null
+  preauth_tat: number | null
+  discharge_tat: number | null
+  submission_tat: number | null
+  payment_tat: number | null
+  query_resolution_tat: number | null
 
   // Ageing & Status
-  ageing_days?: number | null
+  ageing_days: number | null
   ageing_bucket: string | null
   final_claim_status: string | null
-  submission_type?: string | null
-  submission_status?: string | null
-  denial_reason?: string | null
-  hospital_remarks?: string | null
+  submission_type: string | null
+  submission_status: string | null
+  denial_reason: string | null
+  hospital_remarks: string | null
 }
 
 export interface ClaimListResponse {
