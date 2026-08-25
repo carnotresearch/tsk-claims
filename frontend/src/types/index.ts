@@ -17,11 +17,13 @@ export interface KPIs {
   total_claims: number
   total_billed: string
   total_approved: string
+  total_settled: string
   total_paid: string
   total_outstanding: string
-  total_settled: string
+  total_deductions: string
   total_tds: string
   approval_rate: number
+  collection_rate: number
 }
 
 export interface TATStats {
@@ -32,10 +34,46 @@ export interface TATStats {
   query_resolution_avg_days: number | null
 }
 
+export interface OperationalTATRow {
+  metric: string
+  stage: 'preauth' | 'discharge' | 'submission' | 'payment' | 'query'
+  average: number
+  fastest: number
+  slowest: number
+  target: number
+  status: string
+}
+
 export interface AgeingBucket {
   bucket: string
   claim_count: number
   outstanding_amt: string
+}
+
+export interface AgeingByPayerRow {
+  payer_type: string
+  bucket_0_30: string
+  bucket_31_60: string
+  bucket_61_90: string
+  bucket_90_plus: string
+  total_outstanding: string
+}
+
+export interface DisallowanceReasonRow {
+  reason: string
+  cases_count: number
+  disallowed_amt: string
+}
+
+export interface StatusSnapshotItem {
+  status: string
+  count: number
+}
+
+export interface StatusSnapshotResponse {
+  preauth_statuses: StatusSnapshotItem[]
+  discharge_statuses: StatusSnapshotItem[]
+  submission_statuses: StatusSnapshotItem[]
 }
 
 export interface PayerPerformance {
@@ -43,8 +81,12 @@ export interface PayerPerformance {
   claim_count: number
   total_billed: string
   total_approved: string
+  total_settled: string
   total_paid: string
+  total_outstanding: string
   approval_rate: number
+  deduction_rate: number
+  collection_rate: number
 }
 
 export interface MonthlyTrend {
@@ -53,6 +95,22 @@ export interface MonthlyTrend {
   total_billed: string
   total_approved: string
   total_paid: string
+}
+
+export interface MonthlyDetailedStats {
+  month: string
+  claim_count: number
+  total_billed: string
+  total_approved: string
+  total_paid: string
+  total_tds: string
+  total_outstanding: string
+  patient_paid: string
+  approval_rate: number
+  paid_rate: number
+  net_collected_rate: number
+  tds_rate: number
+  variance: string
 }
 
 export interface StatusBreakdown {
@@ -69,14 +127,44 @@ export interface ClaimSummary {
   date_admission: string | null
   date_discharge: string | null
   los_days: number | null
+  procedure_name: string | null
   payer_type: string | null
   insurer_name: string | null
+  tpa_name: string | null
+  policy_no: string | null
+
+  // Financials
+  preauth_requested_amt: string | null
+  preauth_approved_amt: string | null
   final_claimed_amt: string | null
   final_bill_approved_amt: string | null
+  hospital_discount: string | null
+  patient_paid_amt: string | null
+  disallowed_amt: string | null
+  settled_amt: string | null
   payment_received_amt: string | null
+  tds_amt: string | null
+  deduction_amt: string | null
   outstanding_amt: string | null
+
+  // Settlement & TATs
+  utr_no: string | null
+  payment_mode: string | null
+  payment_received_date: string | null
+  preauth_tat: number | null
+  discharge_tat: number | null
+  submission_tat: number | null
+  payment_tat: number | null
+  query_resolution_tat: number | null
+
+  // Ageing & Status
+  ageing_days: number | null
   ageing_bucket: string | null
   final_claim_status: string | null
+  submission_type: string | null
+  submission_status: string | null
+  denial_reason: string | null
+  hospital_remarks: string | null
 }
 
 export interface ClaimListResponse {
