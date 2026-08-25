@@ -11,9 +11,10 @@ Flow per message:
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
@@ -27,6 +28,17 @@ log = logging.getLogger(__name__)
 
 _SELECT_RE = re.compile(r"^\s*SELECT\b", re.IGNORECASE)
 _MAX_ROWS = 500
+
+
+def _to_json_safe(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert DB row values to JSON-serializable types for JSONB storage."""
+    def _coerce(v: Any) -> Any:
+        if isinstance(v, Decimal):
+            return float(v)
+        if isinstance(v, (datetime, date)):
+            return v.isoformat()
+        return v
+    return [{k: _coerce(v) for k, v in row.items()} for row in rows]
 
 # ── Schema context given to the LLM ──────────────────────────────────────────
 _SCHEMA_PROMPT = """
@@ -139,7 +151,7 @@ async def handle_message(
         sql = None
     else:
         try:
-            result_rows = await _run_query(db, sql)
+            result_rows = _to_json_safe(await _run_query(db, sql))
         except Exception as exc:
             log.warning("SQL execution failed: %s", exc)
             answer_content = f"I ran into an error executing the query: {exc}"
@@ -150,7 +162,6 @@ async def handle_message(
                 answer_content = await llm.generate_answer(user_content, sql, result_rows)
             except Exception as exc:
                 log.warning("LLM analysis failed: %s", exc)
-                # Fallback to a simple count summary so the user still gets something
                 answer_content = (
                     f"Query returned {len(result_rows)} row(s)."
                     if result_rows
