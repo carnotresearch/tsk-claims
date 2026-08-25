@@ -13,11 +13,11 @@ const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/claims', icon: FileText, label: 'Claims' },
   { to: '/chat', icon: MessageSquare, label: 'icarKno Chat' },
-  { to: '/sync', icon: RefreshCw, label: 'Sync' },
 ]
 
 const adminNav = [
   { to: '/users', icon: Users, label: 'Users' },
+  { to: '/sync', icon: RefreshCw, label: 'Sync' },
 ]
 
 export default function Sidebar() {
