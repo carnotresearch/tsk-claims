@@ -2,14 +2,27 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, UserCheck, UserX } from 'lucide-react'
 import { getUsers, createUser, deactivateUser } from '../api/users'
+import { getHospitals } from '../api/hospitals'
 import type { User } from '../types'
 import Spinner from '../components/ui/Spinner'
 import Badge from '../components/ui/Badge'
 
 function AddUserModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', role: 'hospital_user' as const, hospital_id: '' })
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'hospital_user' as 'hospital_user' | 'admin',
+    hospital_id: '' as string,
+  })
   const [error, setError] = useState('')
+
+  const hospitalsQ = useQuery({
+    queryKey: ['hospitals'],
+    queryFn: getHospitals,
+    staleTime: 0, // always fresh — new hospitals appear after Excel upload
+  })
 
   const create = useMutation({
     mutationFn: () => createUser({
@@ -17,7 +30,8 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
       hospital_id: form.hospital_id ? Number(form.hospital_id) : undefined,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); onClose() },
-    onError: (e: unknown) => setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to create user'),
+    onError: (e: unknown) =>
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to create user'),
   })
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -41,22 +55,42 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <select className="input" value={form.role} onChange={e => set('role', e.target.value)}>
+            <select className="input" value={form.role} onChange={e => { set('role', e.target.value); set('hospital_id', '') }}>
               <option value="hospital_user">Hospital User</option>
               <option value="admin">Admin</option>
             </select>
           </div>
           {form.role === 'hospital_user' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Hospital ID</label>
-              <input type="number" className="input" placeholder="1" value={form.hospital_id} onChange={e => set('hospital_id', e.target.value)} />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Hospital</label>
+              {hospitalsQ.isLoading ? (
+                <div className="input flex items-center text-gray-400 text-sm">Loading hospitals…</div>
+              ) : (
+                <select
+                  className="input"
+                  value={form.hospital_id}
+                  onChange={e => set('hospital_id', e.target.value)}
+                >
+                  <option value="">— Select hospital —</option>
+                  {hospitalsQ.data?.map(h => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+              )}
+              {hospitalsQ.data?.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">No hospitals found. Upload an Excel file first to populate hospitals.</p>
+              )}
             </div>
           )}
           {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
         </div>
         <div className="flex gap-2 mt-6">
           <button className="btn-secondary flex-1" onClick={onClose}>Cancel</button>
-          <button className="btn-primary flex-1" onClick={() => create.mutate()} disabled={create.isPending}>
+          <button
+            className="btn-primary flex-1"
+            onClick={() => create.mutate()}
+            disabled={create.isPending || (form.role === 'hospital_user' && !form.hospital_id)}
+          >
             {create.isPending ? 'Creating…' : 'Create User'}
           </button>
         </div>
@@ -68,7 +102,13 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
 export default function Users() {
   const qc = useQueryClient()
   const [showModal, setShowModal] = useState(false)
+
   const { data: users, isLoading } = useQuery({ queryKey: ['users'], queryFn: getUsers })
+  const { data: hospitals } = useQuery({ queryKey: ['hospitals'], queryFn: getHospitals, staleTime: 0 })
+
+  // Build id → name lookup for the table
+  const hospitalName = (id: number | null) =>
+    id == null ? '—' : (hospitals?.find(h => h.id === id)?.name ?? `ID ${id}`)
 
   const deactivate = useMutation({
     mutationFn: (id: number) => deactivateUser(id),
@@ -89,7 +129,7 @@ export default function Users() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Email', 'Name', 'Role', 'Hospital ID', 'Status', ''].map(h => (
+                {['Email', 'Name', 'Role', 'Hospital', 'Status', ''].map(h => (
                   <th key={h} className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -104,7 +144,7 @@ export default function Users() {
                       {u.role.replace('_', ' ')}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-gray-500">{u.hospital_id ?? '—'}</td>
+                  <td className="py-3 px-4 text-gray-600 text-sm">{hospitalName(u.hospital_id)}</td>
                   <td className="py-3 px-4">
                     <Badge label={u.is_active ? 'Active' : 'Inactive'} />
                   </td>

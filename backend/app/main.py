@@ -13,6 +13,7 @@ from app.api.v1 import claims as claims_router
 from app.api.v1 import analytics as analytics_router
 from app.api.v1 import users as users_router
 from app.api.v1 import chat as chat_router
+from app.api.v1 import hospitals as hospitals_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +47,7 @@ app.include_router(claims_router.router, prefix="/api/v1")
 app.include_router(analytics_router.router, prefix="/api/v1")
 app.include_router(users_router.router, prefix="/api/v1")
 app.include_router(chat_router.router, prefix="/api/v1")
+app.include_router(hospitals_router.router, prefix="/api/v1")
 
 
 @app.get("/api/health", tags=["health"])

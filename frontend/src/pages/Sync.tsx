@@ -29,6 +29,7 @@ export default function Sync() {
       setResult(data)
       qc.invalidateQueries({ queryKey: ['sync-logs'] })
       qc.invalidateQueries({ queryKey: ['server-file-status'] })
+      qc.invalidateQueries({ queryKey: ['hospitals'] })
     },
   })
 
@@ -37,6 +38,7 @@ export default function Sync() {
     onSuccess: (data) => {
       setTriggerResult(data)
       qc.invalidateQueries({ queryKey: ['sync-logs'] })
+      qc.invalidateQueries({ queryKey: ['hospitals'] })
     },
   })
 
