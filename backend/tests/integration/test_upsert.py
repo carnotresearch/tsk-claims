@@ -117,63 +117,43 @@ class TestClaimsInsert:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Claims upsert — skip (no change)
+# Claims upsert — re-run (wipe-then-insert strategy)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestClaimsSkip:
-    async def test_rerun_skips_all_unchanged(self, db_session, parsed_workbook):
+class TestClaimsRerun:
+    async def test_rerun_reinserts_all(self, db_session, parsed_workbook):
+        """Second sync wipes and reinserts — all 20 claims inserted again."""
         await upsert_workbook(db_session, parsed_workbook)
         stats2 = await upsert_workbook(db_session, parsed_workbook)
 
-        assert stats2.claims_inserted == 0
+        assert stats2.claims_inserted == 20
         assert stats2.claims_updated == 0
-        assert stats2.claims_skipped == 20
+        assert stats2.claims_skipped == 0
 
     async def test_row_count_unchanged_after_rerun(self, db_session, parsed_workbook):
+        """Row count stays at 20 after two syncs (wipe + reinsert = same count)."""
         await upsert_workbook(db_session, parsed_workbook)
         await upsert_workbook(db_session, parsed_workbook)
         result = await db_session.execute(select(func.count()).select_from(Claim))
         assert result.scalar_one() == 20
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Claims upsert — update (row changed)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestClaimsUpdate:
-    async def test_changed_field_triggers_update(self, db_session, parsed_workbook):
-        """Modify one claim in the parsed result — should trigger 1 update."""
+    async def test_modified_field_reflected_after_rerun(self, db_session, parsed_workbook):
+        """A mutated claim in the second sync is persisted (always fresh insert)."""
+        import copy
         await upsert_workbook(db_session, parsed_workbook)
 
-        # Mutate one claim
-        import copy, hashlib
         modified = copy.deepcopy(parsed_workbook)
-        target = modified.claims[0]
-        target.hospital_remarks = "Updated remark for test"
-        # Must also change the hash so upsert detects the change
-        target.raw_row_hash = hashlib.md5(b"changed").hexdigest()
+        modified.claims[0].hospital_remarks = "Updated remark for test"
 
         stats = await upsert_workbook(db_session, modified)
-        assert stats.claims_updated == 1
-        assert stats.claims_skipped == 19
-        assert stats.claims_inserted == 0
-
-    async def test_updated_field_persisted(self, db_session, parsed_workbook):
-        await upsert_workbook(db_session, parsed_workbook)
-
-        import copy, hashlib
-        modified = copy.deepcopy(parsed_workbook)
-        target = modified.claims[0]
-        target.hospital_remarks = "Test update persisted"
-        target.raw_row_hash = hashlib.md5(b"new_hash").hexdigest()
-
-        await upsert_workbook(db_session, modified)
+        assert stats.claims_inserted == 20
+        assert stats.claims_errored == 0
 
         result = await db_session.execute(
             select(Claim).where(Claim.hsk_ref_id == "TANCL-0001")
         )
         claim = result.scalar_one()
-        assert claim.hospital_remarks == "Test update persisted"
+        assert claim.hospital_remarks == "Updated remark for test"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

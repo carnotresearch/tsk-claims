@@ -11,7 +11,7 @@ Usage:
 The pipeline:
   1. Gets the file stream from the source adapter
   2. Parses it (excel_parser)
-  3. Upserts to database (upsert)
+  3. Wipes existing claims/query_denials/lookups and inserts fresh (upsert)
   4. Writes an audit log entry (ExcelSyncLog)
   5. Returns a SyncResult
 """

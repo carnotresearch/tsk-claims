@@ -100,12 +100,13 @@ class TestRunSync:
         assert log.rows_inserted == 20
         assert log.rows_processed == 20
 
-    async def test_second_sync_skips_all(self, db_session, excel_bytes):
+    async def test_second_sync_reinserts_all(self, db_session, excel_bytes):
+        """Second sync with same file wipes and reinserts — all 20 claims inserted."""
         source = UploadSource(excel_bytes, "tracker.xlsx")
         await run_sync(db_session, source, triggered_by="test")
         result2 = await run_sync(db_session, source, triggered_by="test")
-        assert result2.rows_skipped == 20
-        assert result2.rows_inserted == 0
+        assert result2.rows_inserted == 20
+        assert result2.rows_skipped == 0
         assert result2.rows_updated == 0
 
     async def test_second_sync_writes_second_log(self, db_session, excel_bytes):

@@ -2,10 +2,14 @@
 Upsert logic — takes parsed data and writes it to the database.
 
 Strategy:
-  - Hospitals: upsert by name (auto-create on first encounter)
-  - Claims: upsert by hsk_ref_id; skip if raw_row_hash unchanged (no-op)
-  - QueryDenials: delete-and-reinsert per hsk_ref_id (simple, avoids drift)
-  - Lookups: upsert by (category, value)
+  - Hospitals: upsert by name (auto-create on first encounter, never deleted)
+  - Claims: wipe all existing rows, insert fresh from Excel
+  - QueryDenials: wipe all existing rows, insert fresh (claims flushed first for FK links)
+  - Lookups: wipe all existing rows, insert fresh
+
+Users are never touched. Hospital records are preserved so that hospital-scoped
+users continue to exist and simply see 0 claims if their hospital has no rows
+in the new Excel.
 
 All operations go through a single AsyncSession passed in from the pipeline.
 """
@@ -14,7 +18,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Hospital, Claim, QueryDenial, Lookup
@@ -27,8 +31,8 @@ logger = logging.getLogger(__name__)
 class UpsertStats:
     hospitals_created: int = 0
     claims_inserted: int = 0
-    claims_updated: int = 0
-    claims_skipped: int = 0
+    claims_updated: int = 0   # always 0 under wipe-then-insert strategy
+    claims_skipped: int = 0   # always 0 under wipe-then-insert strategy
     claims_errored: int = 0
     query_denials_inserted: int = 0
     lookups_inserted: int = 0
@@ -37,36 +41,57 @@ class UpsertStats:
 
 async def upsert_workbook(db: AsyncSession, parsed: ParsedWorkbook) -> UpsertStats:
     """
-    Persist all parsed data into the database.
+    Persist all parsed data into the database using a wipe-then-insert strategy.
+
+    Existing claims, query denials, and lookups are deleted first so that the
+    database always reflects exactly what is in the uploaded Excel file.
+    Hospitals and users are never deleted.
+
     Returns per-entity counts for the sync log.
     """
     stats = UpsertStats()
 
-    # 1. Hospitals
+    # 1. Hospitals — upsert by name (preserve existing, create new)
+    #    Must run before the wipe so hospital_map is available for FK assignment.
     hospital_map = await _upsert_hospitals(db, parsed.hospitals, stats)
 
-    # 2. Lookups
-    await _upsert_lookups(db, parsed.lookups, stats)
+    # 2. Wipe transactional data in FK-safe order
+    #    (query_denials → claims → lookups; hospitals and users are untouched)
+    await db.execute(delete(QueryDenial))
+    await db.execute(delete(Claim))
+    await db.execute(delete(Lookup))
 
-    # 3. Claims — build existing claim map for O(1) lookups
-    existing = await _load_existing_claims(db)
+    # 3. Insert all claims fresh; collect ORM objects for later FK linking
+    added_claims: list[Claim] = []
     for parsed_claim in parsed.claims:
-        await _upsert_claim(db, parsed_claim, hospital_map, existing, stats)
+        claim_obj = _insert_claim(db, parsed_claim, hospital_map, stats)
+        if claim_obj is not None:
+            added_claims.append(claim_obj)
 
-    # 4. Query denials — rebuild from parsed data
+    # 4. Flush to let Postgres assign PKs on all newly inserted Claim rows
+    await db.flush()
+
+    # 5. Build hsk_ref_id → Claim map (ids are now populated post-flush)
+    new_claims: dict[str, Claim] = {
+        c.hsk_ref_id: c for c in added_claims if c.hsk_ref_id
+    }
+
+    # 6. Insert query denials with correct FK links to the new claims
     if parsed.query_denials:
-        await _upsert_query_denials(db, parsed.query_denials, existing, stats)
+        _insert_query_denials(db, parsed.query_denials, new_claims, stats)
+
+    # 7. Insert lookups fresh
+    _insert_lookups(db, parsed.lookups, stats)
 
     await db.flush()
     logger.info(
-        "Upsert complete: hospitals=%d, claims_inserted=%d, claims_updated=%d, "
-        "claims_skipped=%d, claims_errored=%d, query_denials=%d",
+        "Sync complete (wipe-then-insert): hospitals=%d, claims_inserted=%d, "
+        "claims_errored=%d, query_denials=%d, lookups=%d",
         stats.hospitals_created,
         stats.claims_inserted,
-        stats.claims_updated,
-        stats.claims_skipped,
         stats.claims_errored,
         stats.query_denials_inserted,
+        stats.lookups_inserted,
     )
     return stats
 
@@ -76,7 +101,7 @@ async def _upsert_hospitals(
     hospitals: list[ParsedHospital],
     stats: UpsertStats,
 ) -> dict[str, int]:
-    """Return {hospital_name: hospital_id} map."""
+    """Return {hospital_name: hospital_id} map. Creates new hospitals; never deletes."""
     hospital_map: dict[str, int] = {}
 
     for ph in hospitals:
@@ -85,7 +110,7 @@ async def _upsert_hospitals(
 
         if existing:
             hospital_map[ph.name] = existing.id
-            # Update location/rohini_id if they were previously null
+            # Backfill location/rohini_id if they were previously null
             if ph.location and not existing.location:
                 existing.location = ph.location
             if ph.rohini_id and not existing.rohini_id:
@@ -105,47 +130,87 @@ async def _upsert_hospitals(
     return hospital_map
 
 
-async def _load_existing_claims(db: AsyncSession) -> dict[str, Claim]:
-    """Load all existing claims keyed by hsk_ref_id for fast lookup."""
-    result = await db.execute(select(Claim))
-    return {c.hsk_ref_id: c for c in result.scalars().all() if c.hsk_ref_id}
-
-
-async def _upsert_claim(
+def _insert_claim(
     db: AsyncSession,
     pc: ParsedClaim,
     hospital_map: dict[str, int],
-    existing: dict[str, Claim],
     stats: UpsertStats,
-) -> None:
+) -> Claim | None:
+    """
+    Insert a single claim. Returns the ORM object on success, None on error.
+
+    Partial claims (missing settlement, null amounts, in-progress status) are
+    inserted as-is — every row with a hospital_name and patient_name is a valid
+    claim regardless of how many fields are filled.
+    """
     hospital_id = hospital_map.get(pc.hospital_name)
     if not hospital_id:
         msg = f"Hospital not found for claim {pc.hsk_ref_id!r}: {pc.hospital_name!r}"
         stats.errors.append(msg)
         stats.claims_errored += 1
         logger.warning(msg)
-        return
+        return None
 
     try:
-        if pc.hsk_ref_id and pc.hsk_ref_id in existing:
-            claim = existing[pc.hsk_ref_id]
-            # Skip if data hasn't changed
-            if claim.raw_row_hash == pc.raw_row_hash:
-                stats.claims_skipped += 1
-                return
-            # Update all fields
-            _apply_claim_fields(claim, pc, hospital_id)
-            stats.claims_updated += 1
-        else:
-            claim = Claim(hospital_id=hospital_id)
-            _apply_claim_fields(claim, pc, hospital_id)
-            db.add(claim)
-            stats.claims_inserted += 1
+        claim = Claim(hospital_id=hospital_id)
+        _apply_claim_fields(claim, pc, hospital_id)
+        db.add(claim)
+        stats.claims_inserted += 1
+        return claim
     except Exception as exc:
-        msg = f"Error upserting claim {pc.hsk_ref_id!r}: {exc}"
+        msg = f"Error inserting claim {pc.hsk_ref_id!r}: {exc}"
         stats.errors.append(msg)
         stats.claims_errored += 1
         logger.error(msg, exc_info=True)
+        return None
+
+
+def _insert_query_denials(
+    db: AsyncSession,
+    query_denials: list[ParsedQueryDenial],
+    new_claims: dict[str, Claim],
+    stats: UpsertStats,
+) -> None:
+    """Insert query denial rows, linking to newly inserted claims by hsk_ref_id."""
+    for pqd in query_denials:
+        claim = new_claims.get(pqd.hsk_ref_id) if pqd.hsk_ref_id else None
+        qd = QueryDenial(
+            claim_id=claim.id if claim else None,
+            hsk_ref_id=pqd.hsk_ref_id,
+            stage=pqd.stage,
+            query_raised_date=pqd.query_raised_date,
+            query_reason_category=pqd.query_reason_category,
+            query_reason_desc=pqd.query_reason_desc,
+            action_required=pqd.action_required,
+            responsible_person=pqd.responsible_person,
+            target_response_date=pqd.target_response_date,
+            response_date=pqd.response_date,
+            resolution_tat=pqd.resolution_tat,
+            resubmission_date=pqd.resubmission_date,
+            disallowed_amt=pqd.disallowed_amt,
+            disallowed_reason=pqd.disallowed_reason,
+            appeal_filed=pqd.appeal_filed,
+            appeal_date=pqd.appeal_date,
+            appeal_outcome=pqd.appeal_outcome,
+            final_recovery=pqd.final_recovery,
+            net_loss=pqd.net_loss,
+            status=pqd.status,
+            remarks=pqd.remarks,
+        )
+        db.add(qd)
+        stats.query_denials_inserted += 1
+
+
+def _insert_lookups(
+    db: AsyncSession,
+    lookups: dict[str, list[str]],
+    stats: UpsertStats,
+) -> None:
+    """Insert all lookup values fresh (table was already wiped)."""
+    for category, values in lookups.items():
+        for value in values:
+            db.add(Lookup(category=category, value=value))
+            stats.lookups_inserted += 1
 
 
 def _apply_claim_fields(claim: Claim, pc: ParsedClaim, hospital_id: int) -> None:
@@ -227,63 +292,3 @@ def _apply_claim_fields(claim: Claim, pc: ParsedClaim, hospital_id: int) -> None
     claim.updated_by = pc.updated_by
     claim.last_updated_date = pc.last_updated_date
     claim.raw_row_hash = pc.raw_row_hash
-
-
-async def _upsert_query_denials(
-    db: AsyncSession,
-    query_denials: list[ParsedQueryDenial],
-    existing_claims: dict[str, Claim],
-    stats: UpsertStats,
-) -> None:
-    """
-    Simple rebuild strategy: delete existing QueryDenial rows for affected
-    hsk_ref_ids, then reinsert fresh from parsed data.
-    """
-    affected_refs = {qd.hsk_ref_id for qd in query_denials if qd.hsk_ref_id}
-    if affected_refs:
-        await db.execute(
-            delete(QueryDenial).where(QueryDenial.hsk_ref_id.in_(affected_refs))
-        )
-
-    for pqd in query_denials:
-        claim = existing_claims.get(pqd.hsk_ref_id) if pqd.hsk_ref_id else None
-        qd = QueryDenial(
-            claim_id=claim.id if claim else None,
-            hsk_ref_id=pqd.hsk_ref_id,
-            stage=pqd.stage,
-            query_raised_date=pqd.query_raised_date,
-            query_reason_category=pqd.query_reason_category,
-            query_reason_desc=pqd.query_reason_desc,
-            action_required=pqd.action_required,
-            responsible_person=pqd.responsible_person,
-            target_response_date=pqd.target_response_date,
-            response_date=pqd.response_date,
-            resolution_tat=pqd.resolution_tat,
-            resubmission_date=pqd.resubmission_date,
-            disallowed_amt=pqd.disallowed_amt,
-            disallowed_reason=pqd.disallowed_reason,
-            appeal_filed=pqd.appeal_filed,
-            appeal_date=pqd.appeal_date,
-            appeal_outcome=pqd.appeal_outcome,
-            final_recovery=pqd.final_recovery,
-            net_loss=pqd.net_loss,
-            status=pqd.status,
-            remarks=pqd.remarks,
-        )
-        db.add(qd)
-        stats.query_denials_inserted += 1
-
-
-async def _upsert_lookups(
-    db: AsyncSession,
-    lookups: dict[str, list[str]],
-    stats: UpsertStats,
-) -> None:
-    for category, values in lookups.items():
-        for value in values:
-            result = await db.execute(
-                select(Lookup).where(Lookup.category == category, Lookup.value == value)
-            )
-            if not result.scalar_one_or_none():
-                db.add(Lookup(category=category, value=value))
-                stats.lookups_inserted += 1
