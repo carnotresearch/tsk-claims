@@ -1,12 +1,14 @@
 ##
-# Production Docker Compose — HTTP only (no SSL)
+# Production Docker Compose — HTTP only (no SSL, no source code on VM)
 #
-# Usage:
+# Usage on VM:
 #   cp .env.example .env        # fill in POSTGRES_PASSWORD, SECRET_KEY, GEMINI_API_KEY
-#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
 #   docker compose -f docker-compose.prod.yml exec backend python scripts/seed_demo.py
 #
-# Exposes port 80.  To make it public on a GCP VM, open port 80 in the firewall rules.
+# Exposes port 80. Open port 80 in GCP firewall rules.
+# Images are built locally and pushed to Docker Hub — no source code on this VM.
 ##
 
 services:
@@ -26,9 +28,7 @@ services:
       retries: 10
 
   backend:
-    build:
-      context: ./backend
-      target: prod
+    image: ${DOCKER_USER}/hsk-backend:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -51,8 +51,7 @@ services:
       - excel_uploads:/app/uploads
 
   frontend:
-    build:
-      context: ./frontend
+    image: ${DOCKER_USER}/hsk-frontend:latest
     restart: unless-stopped
 
   nginx:
@@ -64,7 +63,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
 
 volumes:
   pgdata:
